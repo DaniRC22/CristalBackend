@@ -108,7 +108,7 @@ router.post('/:id/verify-payment', async (req, res, next) => {
       await supabase.from('orders').update({ mp_payment_id: paymentId }).eq('id', order.id);
     }
 
-    if (paymentStatus === 'approved') {
+    if (paymentStatus === 'approved' || paymentStatus === 'authorized') {
       await supabase.rpc('approve_order', { p_order_id: order.id });
       res.json({ updated: true, payment_status: paymentStatus });
     } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {

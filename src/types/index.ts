@@ -26,6 +26,13 @@ export interface CheckoutBody {
   postal_code: string;
   payment_method: PaymentMethod;
   shipping_method: ShippingMethod;
+  shipping_first_name?: string;
+  shipping_last_name?: string;
+  shipping_address?: string;
+  shipping_address2?: string;
+  shipping_city?: string;
+  shipping_province?: string;
+  shipping_postal_code?: string;
 }
 
 // ── DB response types ───────────────────────────────────────────────────────
@@ -61,6 +68,13 @@ export interface DBOrder {
   postal_code?: string;
   payment_method?: PaymentMethod;
   shipping_method?: ShippingMethod;
+  shipping_first_name?: string;
+  shipping_last_name?: string;
+  shipping_address?: string;
+  shipping_address2?: string;
+  shipping_city?: string;
+  shipping_province?: string;
+  shipping_postal_code?: string;
   created_at: string;
   order_items?: DBOrderItem[];
 }

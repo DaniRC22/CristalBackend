@@ -97,6 +97,13 @@ router.post('/', async (req, res, next) => {
       postal_code,
       payment_method = 'mercadopago',
       shipping_method = 'retiro',
+      shipping_first_name,
+      shipping_last_name,
+      shipping_address,
+      shipping_address2,
+      shipping_city,
+      shipping_province,
+      shipping_postal_code,
     } = body as unknown as CheckoutBody;
 
     const customer_name = `${str(first_name)} ${str(last_name)}`.trim();
@@ -152,6 +159,15 @@ router.post('/', async (req, res, next) => {
         status: 'pending',
         payment_method,
         shipping_method,
+        ...(shipping_first_name && {
+          shipping_first_name: str(shipping_first_name),
+          shipping_last_name:  str(shipping_last_name ?? ''),
+          shipping_address:    str(shipping_address ?? ''),
+          shipping_address2:   str(shipping_address2 ?? ''),
+          shipping_city:       str(shipping_city ?? ''),
+          shipping_province:   str(shipping_province ?? ''),
+          shipping_postal_code: str(shipping_postal_code ?? ''),
+        }),
       })
       .select('id')
       .single();
@@ -210,9 +226,10 @@ router.post('/', async (req, res, next) => {
     });
 
     const frontendUrl = process.env.FRONTEND_URL!;
+    let preferenceId: string;
     let initPoint: string;
     try {
-      initPoint = await createPreference(mpItems, order.id, frontendUrl, {
+      const result = await createPreference(mpItems, order.id, frontendUrl, {
         firstName: str(first_name),
         lastName: str(last_name),
         email: str(customer_email),
@@ -222,12 +239,14 @@ router.post('/', async (req, res, next) => {
         province: str(province),
         postalCode: str(postal_code),
       });
+      preferenceId = result.preferenceId;
+      initPoint = result.initPoint;
     } catch (mpErr) {
       await deleteOrder();
       throw mpErr;
     }
 
-    res.json({ order_id: order.id, init_point: initPoint, needs_mp: true });
+    res.json({ order_id: order.id, preference_id: preferenceId, init_point: initPoint, needs_mp: true });
   } catch (err) {
     next(err);
   }

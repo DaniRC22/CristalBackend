@@ -1,9 +1,4 @@
-import * as MercadoPagoReal from 'mercadopago';
-import { mockMercadopagoModule } from '../lib/mercadopago-mock';
-
-// Use mock if dummy key
-const isDummyMP = !process.env.MP_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN.includes('dummy') || process.env.MP_ACCESS_TOKEN.length < 10;
-const { MercadoPagoConfig, Preference } = isDummyMP ? mockMercadopagoModule : MercadoPagoReal;
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN!,
@@ -34,8 +29,10 @@ export async function createPreference(
   baseUrl: string,
   customer: Customer,
   _paymentMethod: string = 'mercadopago'
-): Promise<string> {
+): Promise<{ initPoint: string; preferenceId: string }> {
   const preference = new Preference(client);
+
+  const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:4000';
 
   const response = await preference.create({
     body: {
@@ -68,9 +65,9 @@ export async function createPreference(
         pending: `${baseUrl}/orden/${orderId}?status=pending`,
       },
       external_reference: String(orderId),
-      notification_url: `${process.env.BACKEND_URL ?? 'http://localhost:4000'}/api/webhook/mp`,
+      notification_url: `${backendUrl}/api/webhook/mp`,
     },
   });
 
-  return response.init_point!;
+  return { initPoint: response.init_point!, preferenceId: response.id! };
 }
