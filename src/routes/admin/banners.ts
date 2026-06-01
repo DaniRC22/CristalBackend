@@ -4,7 +4,17 @@ import { supabase } from '../../lib/supabase';
 import { uploadBannerImage } from '../../services/storage';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Solo imágenes y videos: rechaza tipos arbitrarios antes de subirlos a Storage.
+const ALLOWED_TYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif',
+  'video/mp4', 'video/webm', 'video/quicktime',
+];
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, ALLOWED_TYPES.includes(file.mimetype)),
+});
 
 router.get('/', async (_req, res, next) => {
   try {

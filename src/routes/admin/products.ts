@@ -92,7 +92,7 @@ router.get('/:id', async (req, res, next) => {
 
     const { data, error } = await supabase
       .from('products')
-      .select('*, categories(name, slug), product_images(id, url, thumb_url, order, is_primary), product_options(id, name, values, sort_order)')
+      .select('*, categories(name, slug), product_images(id, url, thumb_url, order, is_primary), product_options(id, name, values, prices, price_mode, sort_order)')
       .eq('id', id)
       .single();
 
@@ -260,12 +260,47 @@ router.get('/:id/options', async (req, res, next) => {
   }
 });
 
+// Normaliza un array de precios opcional. Devuelve:
+//   - undefined si el caller no mandó nada (no tocar la columna)
+//   - [] si el caller mandó pero todos los precios son inválidos/cero/vacíos
+//   - array de mismo length que values, con number positivo o null por posición
+function normalizePrices(rawPrices: unknown, valuesLen: number): (number | null)[] | undefined {
+  if (rawPrices === undefined) return undefined;
+  if (!Array.isArray(rawPrices)) return [];
+  if (rawPrices.length === 0) return [];
+
+  // Si vino con length distinto a values, asumimos "no overrides" para no romper.
+  if (rawPrices.length !== valuesLen) return [];
+
+  const cleaned = rawPrices.map((p) => {
+    if (p === null || p === undefined || p === '') return null;
+    const n = typeof p === 'number' ? p : parseFloat(String(p));
+    if (!Number.isFinite(n) || n <= 0) return null;
+    // Cap razonable para evitar overflow / errores de tipeo
+    if (n > 99_999_999) return null;
+    return Math.round(n * 100) / 100;
+  });
+
+  // Si todos quedaron null, devolver [] para mantener el caso "sin overrides"
+  if (cleaned.every((p) => p === null)) return [];
+  return cleaned;
+}
+
+const VALID_PRICE_MODES = new Set(['override', 'addon']);
+
+function normalizePriceMode(raw: unknown): 'override' | 'addon' | undefined {
+  if (typeof raw !== 'string') return undefined;
+  return VALID_PRICE_MODES.has(raw) ? (raw as 'override' | 'addon') : undefined;
+}
+
 router.post('/:id/options', async (req, res, next) => {
   try {
     const id = parsePositiveInt(req.params.id);
     if (!id) { res.status(400).json({ error: 'ID inválido' }); return; }
 
-    const { name, values, sort_order } = req.body as { name: string; values: string[]; sort_order?: number };
+    const { name, values, prices, price_mode, sort_order } = req.body as {
+      name: string; values: string[]; prices?: unknown; price_mode?: unknown; sort_order?: number;
+    };
     if (!name || typeof name !== 'string' || !name.trim()) {
       res.status(400).json({ error: 'El nombre de la opción es requerido' });
       return;
@@ -275,10 +310,19 @@ router.post('/:id/options', async (req, res, next) => {
       return;
     }
     const cleanValues = values.map((v) => String(v).trim()).filter(Boolean).slice(0, 50);
+    const cleanPrices = normalizePrices(prices, cleanValues.length) ?? [];
+    const cleanMode = normalizePriceMode(price_mode) ?? 'override';
 
     const { data, error } = await supabase
       .from('product_options')
-      .insert({ product_id: id, name: name.trim(), values: cleanValues, sort_order: sort_order ?? 0 })
+      .insert({
+        product_id: id,
+        name: name.trim(),
+        values: cleanValues,
+        prices: cleanPrices,
+        price_mode: cleanMode,
+        sort_order: sort_order ?? 0,
+      })
       .select()
       .single();
     if (error) throw error;
@@ -294,14 +338,29 @@ router.put('/:id/options/:optId', async (req, res, next) => {
     const optId = parsePositiveInt(req.params.optId);
     if (!id || !optId) { res.status(400).json({ error: 'ID inválido' }); return; }
 
-    const { name, values, sort_order } = req.body as { name?: string; values?: string[]; sort_order?: number };
+    const { name, values, prices, price_mode, sort_order } = req.body as {
+      name?: string; values?: string[]; prices?: unknown; price_mode?: unknown; sort_order?: number;
+    };
     const cleanValues = Array.isArray(values)
       ? values.map((v) => String(v).trim()).filter(Boolean).slice(0, 50)
       : undefined;
+    // Si cambian los values y no mandan prices, reseteamos prices a [] para
+    // evitar que el constraint length-match falle (prices viejo puede tener
+    // length distinto al values nuevo).
+    const cleanPrices = cleanValues !== undefined
+      ? (normalizePrices(prices, cleanValues.length) ?? [])
+      : normalizePrices(prices, 0);
+    const cleanMode = normalizePriceMode(price_mode);
 
     const { data, error } = await supabase
       .from('product_options')
-      .update({ name, values: cleanValues, sort_order })
+      .update({
+        ...(name !== undefined && { name }),
+        ...(cleanValues !== undefined && { values: cleanValues }),
+        ...(cleanPrices !== undefined && { prices: cleanPrices }),
+        ...(cleanMode !== undefined && { price_mode: cleanMode }),
+        ...(sort_order !== undefined && { sort_order }),
+      })
       .eq('id', optId)
       .eq('product_id', id)
       .select()

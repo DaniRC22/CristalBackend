@@ -4,7 +4,14 @@ import { supabase } from '../../lib/supabase';
 import { uploadCategoryImage } from '../../services/storage';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Solo imágenes: rechaza tipos arbitrarios antes de subirlos a Storage.
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, ALLOWED_TYPES.includes(file.mimetype)),
+});
 
 router.get('/', async (_req, res, next) => {
   try {
@@ -21,40 +28,29 @@ router.get('/', async (_req, res, next) => {
 
 router.post('/', upload.single('image'), async (req, res, next) => {
   try {
-    console.log('📝 POST /admin/categories - Creando nueva categoría');
     const { name, parent_id, order, active } = req.body;
-    console.log('📋 Datos recibidos:', { name, parent_id, order, active });
 
     const slug = name
       .toLowerCase()
       .normalize('NFD').replace(/\p{Diacritic}/gu, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-    console.log('🏷️ Slug generado:', slug);
 
     let imageUrl: string | undefined;
     if (req.file) {
-      console.log('🖼️ Imagen detectada:', req.file.originalname);
       imageUrl = await uploadCategoryImage(req.file);
-      console.log('✅ Imagen subida. URL:', imageUrl);
     }
 
-    console.log('💾 Insertando categoría en Supabase:', { name, slug, image_url: imageUrl, parent_id, order, active });
     const { data, error } = await supabase
       .from('categories')
       .insert({ name, slug, image_url: imageUrl, parent_id: parent_id || null, order: order ?? 0, active: active !== 'false' })
       .select()
       .single();
 
-    if (error) {
-      console.error('❌ Error insertando categoría:', error.message);
-      throw error;
-    }
+    if (error) throw error;
 
-    console.log('✅ Categoría creada exitosamente:', data);
     res.status(201).json(data);
   } catch (err) {
-    console.error('❌ Error en POST /admin/categories:', err);
     next(err);
   }
 });

@@ -18,7 +18,7 @@ router.get('/', async (req, res, next) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    const withStatus = (data as DBStockProduct[] ?? []).map((p) => ({
+    const withStatus = (data as unknown as DBStockProduct[] ?? []).map((p) => ({
       ...p,
       status: (p.stock === 0 ? 'out' : p.stock <= p.low_stock_threshold ? 'low' : 'ok') as StockStatus,
     }));

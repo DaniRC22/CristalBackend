@@ -1,5 +1,13 @@
 node_modules/
 dist/
+
+# Ignorar TODOS los archivos de entorno (.env, .env.production, etc.)
+# excepto los templates de ejemplo que sí van versionados.
 .env
+.env.*
+!.env.example
+!deploy/.env.production.example
+!deploy/.env.frontend.production.example
+
 .mcp.json
 supabase/.temp/

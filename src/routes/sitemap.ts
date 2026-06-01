@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/', async (_req, res, next) => {
   try {
-    const baseUrl = process.env.FRONTEND_URL ?? 'https://kap.com.ar';
+    const baseUrl = process.env.FRONTEND_URL ?? 'https://cristalequipamientos.com';
 
     const { data: products } = await supabase
       .from('products')

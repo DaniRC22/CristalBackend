@@ -1,6 +1,6 @@
 // ── Tipos de dominio ────────────────────────────────────────────────────────
 
-export type PaymentMethod = 'transfer' | 'presencial' | 'mercadopago' | 'mercado_credito';
+export type PaymentMethod = 'transfer' | 'presencial' | 'mercadopago' | 'tarjeta';
 export type ShippingMethod = 'retiro' | 'flete';
 export type OrderStatus = 'pending' | 'approved' | 'cancelled';
 export type StockStatus = 'ok' | 'low' | 'out';
@@ -33,9 +33,19 @@ export interface CheckoutBody {
   shipping_city?: string;
   shipping_province?: string;
   shipping_postal_code?: string;
+  notes?: string;
 }
 
 // ── DB response types ───────────────────────────────────────────────────────
+
+export type PriceMode = 'override' | 'addon';
+
+export interface DBProductOption {
+  name: string;
+  values: string[];
+  prices: (number | string | null)[] | null;
+  price_mode?: PriceMode;
+}
 
 export interface DBProduct {
   id: number;
@@ -44,6 +54,7 @@ export interface DBProduct {
   stock: number;
   transfer_discount_pct: number | null;
   product_images: { url: string; is_primary: boolean }[];
+  product_options?: DBProductOption[];
 }
 
 export interface DBOrderItem {

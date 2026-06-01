@@ -23,9 +23,11 @@ router.get('/', async (req, res, next) => {
 
     if (status) query = query.eq('status', status);
     if (date) {
+      // El admin filtra en horario Argentina (UTC-3). Convertimos a timestamptz
+      // para que Postgres haga la comparación contra el rango correcto.
       query = query
-        .gte('created_at', `${date}T00:00:00.000Z`)
-        .lte('created_at', `${date}T23:59:59.999Z`);
+        .gte('created_at', `${date}T00:00:00-03:00`)
+        .lte('created_at', `${date}T23:59:59.999-03:00`);
     }
 
     const { data, error, count } = await query;
@@ -81,7 +83,7 @@ router.post('/:id/verify-payment', async (req, res, next) => {
 
     if (orderError || !order) { res.status(404).json({ error: 'Orden no encontrada' }); return; }
     if (order.status !== 'pending') { res.json({ updated: false, reason: 'La orden no está pendiente' }); return; }
-    if (!['mercadopago', 'mercado_credito'].includes(order.payment_method ?? '')) {
+    if (order.payment_method !== 'mercadopago') {
       res.json({ updated: false, reason: 'La orden no es de MercadoPago' }); return;
     }
 
@@ -112,7 +114,7 @@ router.post('/:id/verify-payment', async (req, res, next) => {
       await supabase.rpc('approve_order', { p_order_id: order.id });
       res.json({ updated: true, payment_status: paymentStatus });
     } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
-      await supabase.from('orders').update({ status: 'cancelled' as OrderStatus }).eq('id', order.id);
+      await supabase.rpc('cancel_order', { p_order_id: order.id });
       res.json({ updated: true, payment_status: paymentStatus });
     } else {
       res.json({ updated: false, reason: `El pago está en estado "${paymentStatus}"` });

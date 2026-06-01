@@ -1,8 +1,13 @@
 import { Router } from 'express';
-import { supabase } from '../lib/supabase';
+import { supabasePublic } from '../lib/supabase';
 
 const router = Router();
 
+// El login y logout pasan por el cliente público (anon key) — JAMÁS por el
+// admin client. signInWithPassword guarda la sesión adentro del client que la
+// ejecuta; si se hiciera con el admin client, todas las queries posteriores
+// dejarían de correr con service_role y caerían a rol authenticated/anon,
+// rompiendo writes (42501) y vaciando reads de tablas RLS-only-service-role.
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body as { email: string; password: string };
@@ -12,7 +17,7 @@ router.post('/login', async (req, res, next) => {
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
 
     if (error || !data.session) {
       res.status(401).json({ error: 'Credenciales inválidas' });
@@ -27,7 +32,7 @@ router.post('/login', async (req, res, next) => {
 
 router.post('/logout', async (_req, res, next) => {
   try {
-    await supabase.auth.signOut();
+    await supabasePublic.auth.signOut();
     res.json({ ok: true });
   } catch (err) {
     next(err);

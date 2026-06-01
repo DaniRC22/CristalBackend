@@ -70,7 +70,7 @@ router.get('/:slug', async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*, categories(name, slug), product_images(id, url, thumb_url, order, is_primary), product_options(id, name, values, sort_order)')
+      .select('*, categories(name, slug), product_images(id, url, thumb_url, order, is_primary), product_options(id, name, values, prices, price_mode, sort_order)')
       .eq('slug', req.params.slug)
       .eq('active', true)
       .single();
