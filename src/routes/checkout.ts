@@ -188,12 +188,13 @@ router.post('/', async (req, res, next) => {
     // aplica) UNA SOLA VEZ y lo cacheamos. Lo reusamos para el total, los
     // order_items.unit_price y los items de la preferencia de MP. Crítico:
     // nunca confiamos en el precio del frontend, siempre recalculamos en backend.
-    const itemPrices = new Map<number, number>(); // product_id → unit price efectivo (sin descuento transfer)
-    const total = (items as CheckoutItem[]).reduce((sum, item) => {
+    const itemPrices = (items as CheckoutItem[]).map((item) => {
       const product = products!.find((p) => p.id === item.product_id)!;
-      const basePrice = Number(product.price);
-      const variantPrice = effectiveUnitPrice(basePrice, item.selected_options, product.product_options);
-      itemPrices.set(item.product_id, variantPrice);
+      return effectiveUnitPrice(Number(product.price), item.selected_options, product.product_options);
+    });
+    const total = (items as CheckoutItem[]).reduce((sum, item, idx) => {
+      const product = products!.find((p) => p.id === item.product_id)!;
+      const variantPrice = itemPrices[idx];
       const discountedPrice =
         isTransfer && product.transfer_discount_pct
           ? variantPrice * (1 - product.transfer_discount_pct / 100)
@@ -241,11 +242,11 @@ router.post('/', async (req, res, next) => {
     };
 
     // Insertar items con el precio efectivo (override de variante si aplica)
-    const orderItems = (items as CheckoutItem[]).map((item) => ({
+    const orderItems = (items as CheckoutItem[]).map((item, idx) => ({
       order_id: order.id,
       product_id: item.product_id,
       quantity: item.quantity,
-      unit_price: itemPrices.get(item.product_id) ?? Number(products!.find((p) => p.id === item.product_id)!.price),
+      unit_price: itemPrices[idx],
       selected_options: item.selected_options ?? null,
     }));
 
@@ -277,14 +278,14 @@ router.post('/', async (req, res, next) => {
     }
 
     // Crear preferencia MP
-    const mpItems = (items as CheckoutItem[]).map((item) => {
+    const mpItems = (items as CheckoutItem[]).map((item, idx) => {
       const product = products!.find((p) => p.id === item.product_id)!;
       const primaryImage = (product.product_images as { url: string; is_primary: boolean }[])
         ?.find((img) => img.is_primary);
       return {
         id: product.id,
         name: product.name,
-        price: itemPrices.get(item.product_id) ?? Number(product.price),
+        price: itemPrices[idx],
         quantity: item.quantity,
         imageUrl: primaryImage?.url,
       };
