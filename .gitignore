@@ -11,3 +11,8 @@ dist/
 
 .mcp.json
 supabase/.temp/
+PASOS_DEPLOYMENT.md
+PLAN_DEPLOYMENT.md
+BUCKETS_SETUP.md
+PASOS_DEPLOY.md
+PLAN_DEPLOY.md
